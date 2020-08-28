@@ -25,9 +25,7 @@ const conn = mongoose.connection;
 
 let gfs;
 conn.once('open',()=>{
-    gfs = Grid(conn.db,mongoose.mongo);
-    gfs.collection("uploads");
-    console.log("connect");
+    gfs = new mongoose.mongo.GridFSBucket(conn.db,{bucketName:'uploads'});
 });
 
 const storage = new GridFsStorage({
@@ -97,7 +95,8 @@ app.get("/files",(req,res)=>{
 });
 
 app.get("/image/:id",(req,res)=>{
-    gfs.files.findOne({filename: req.params.id},(err,file)=>{
+    gfs.openDownloadStreamByName(req.params.id,)
+    gfs.files.findOne({filename: },(err,file)=>{
         if(err){
             return res.log("<h1>404 Error<h1>");
         }
@@ -110,13 +109,6 @@ app.get("/image/:id",(req,res)=>{
 
 
 app.delete("/files/:id",(req,res)=>{
-
-    gfs.remove({_id:req.params.id,root: "uploads"}, function (err, gridStore) {
-        if (err){
-            console.log("error");
-        }else{
-            console.log('success');
-            res.redirect("/");
-        }
-      });
+    gfs.delete(mongoose.Types.ObjectId(req.params.id));
+    res.redirect('/');
 });
