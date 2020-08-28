@@ -11,22 +11,33 @@ const bodyparser = require('body-parser');
 require('dotenv').config();
 
 
+
 const app = express();
 app.set("view engine","ejs");
 app.use(express.static("./public"));
 app.use(bodyparser.json());
 app.use(methodoverride('_method'));
 
-
-
 const mongoUri = process.env.DB_URI;
-mongoose.connect(mongoUri,{useUnifiedTopology:true,useNewUrlParser:true});
+
+
+mongoose.connect(mongoUri, {
+    useUnifiedTopology: true,
+    useNewUrlParser: true,
+  })
+.then(() => console.log('DB Connected!'))
+.catch(err => {
+console.log(`DB Connection Error: ${err.message}`);
+});
 const conn = mongoose.connection;
 
-let gfs;
-conn.once('open',()=>{
-    gfs = new mongoose.mongo.GridFSBucket(conn.db,{bucketName:'uploads'});
+
+let bucket;
+conn.once('open',(err)=>{
+  bucket = new mongoose.mongo.GridFSBucket(conn.db,{bucketName:"uploads"});
 });
+
+
 
 const storage = new GridFsStorage({
     url: mongoUri,
@@ -61,54 +72,46 @@ app.listen(port,(err)=>{
 
 
 app.get("/",(req,res)=>{
-    gfs.files.find().toArray((err,files)=>{
-        if(!files || files.length === 0){
-            res.render("index",{files:false});
-        }else{
-            files.map(file =>{
-                if(file.contentType === "image/jpeg" || file.contentType === "image/png")
-                {
-                    file.isImage = true;
-                }
-                else{
-                    file.isImage = false;
-                }
-            });
-            res.render("index",{files:files});
-        }
-    })
+  bucket.find().toArray((err,files)=>{
+    if(!files || files.length === 0){
+        res.render("index",{files:false});
+    }else{
+        files.map(file =>{
+            if(file.contentType === "image/jpeg" || file.contentType === "image/png" )
+            {
+                file.isImage = true;
+            }
+            else{
+                file.isImage = false;
+            }
+        });
+        res.render("index",{files:files});
+    }
+})
 });
 
-app.post("/upload",upload.single('myFile'),(req,res)=>{
-    console.log(req.body);
+app.post("/upload",upload.array('myFile',20),(req,res)=>{
+    res.redirect('/');
 });
 
 app.get("/files",(req,res)=>{
-    gfs.files.find().toArray((err,files)=>{
-        if(err){
-            return res.log("<h1>404 Error<h1>");
-        }
-        else{
-            return res.json({files:files});
-        }
-    });
+  bucket.find().toArray((err,files)=>{
+    if(err){
+        return res.log("<h1>404 Error<h1>");
+    }
+    else{
+        return res.json({files:files});
+    }
+  });
 });
 
 app.get("/image/:id",(req,res)=>{
-    gfs.openDownloadStreamByName(req.params.id,)
-    gfs.files.findOne({filename: },(err,file)=>{
-        if(err){
-            return res.log("<h1>404 Error<h1>");
-        }
-        else{
-            var readstream = gfs.createReadStream(file);
-            readstream.pipe(res);
-        }
-    })
+  const stream = bucket.openDownloadStreamByName(req.params.id);
+  stream.pipe(res);
 });
 
 
 app.delete("/files/:id",(req,res)=>{
-    gfs.delete(mongoose.Types.ObjectId(req.params.id));
+    bucket.delete(mongoose.Types.ObjectId(req.params.id));
     res.redirect('/');
 });
